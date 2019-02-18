@@ -57,11 +57,7 @@ solve' g w = myTrace ("Solve " ++ show g ++ " ||- " ++ show w) $ do
   (g2,w2,s2) <- simpl g' (w' ++ extraCts)
   -- Implication time
   let s@(Solution sg rs theta _) = toSolution g2 w2 s2
-  let theta' = concatMap (\x -> case x of
-          (Constraint_Unify (MonoType_Var v) m) -> [(v, m)]
-          _ -> []
-          ) sg
-  solveImpl (g2 ++ rs) (substs (theta ++ theta') implic)
+  solveImpl (g2 ++ rs) (substs theta implic)
   return s
 
 solveImpl :: [Constraint] -> [Constraint] -> SMonad ()
@@ -210,10 +206,7 @@ canon isGiven injectiveP rest (Constraint_Unify t1 t2) = case (t1,t2) of
   (MonoType_Var v, _)
     | v `elem` (fv t2 :: [TyVar]), isFamilyFree t2
                       -> throwNamedError (SolverError_Infinite v t2)
-    | isFamilyFree t2 -> do b <- isTouchable v  -- Check touchability when no family
-                            if b || isGiven
-                               then return NotApplicable
-                               else return NotApplicable --throwNamedError (SolverError_NonTouchable [v])
+    | isFamilyFree t2 -> return NotApplicable
     | otherwise -> case t2 of
                      MonoType_Con _    -> return NotApplicable
                      MonoType_App c a  -> do (a2, con1, vars1) <- unfamily a
