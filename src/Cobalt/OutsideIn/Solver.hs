@@ -1,6 +1,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE ViewPatterns #-}
 module Cobalt.OutsideIn.Solver (
   SMonad
 , Solution(..)
@@ -178,7 +179,7 @@ canon isGiven injectiveP rest (Constraint_Unify t1 t2) = case (t1,t2) of
     | v1 == v2  -> return $ Applied []  -- Refl
     | otherwise -> do touch1 <- isTouchable v1
                       touch2 <- isTouchable v2
-                      case (touch1, touch2) of
+                      case (touch1 || isGiven, touch2 || isGiven) of
                        (False, False) -> do -- Note: if we have two variables being unified to equal polytypes
                                             -- it is allowed to unify them, since they represent the same type
                          let findVar vToSearch (Constraint_Inst  (MonoType_Var v) _) | v == vToSearch = True
@@ -228,6 +229,7 @@ canon isGiven injectiveP rest (Constraint_Unify t1 t2) = case (t1,t2) of
     return $ Applied [Constraint_Unify s1 s2, Constraint_Unify r1 r2]
   (_ :-->: _, MonoType_Con _) -> throwNamedError (SolverError_Unify UnifyErrorReason_Head t1 t2)
   (MonoType_Con _, _ :-->: _) -> throwNamedError (SolverError_Unify UnifyErrorReason_Head t1 t2)
+  (MonoType_Con _, MonoType_App _ _) -> throwNamedError (SolverError_Unify UnifyErrorReason_Head t1 t2)
   (MonoType_Con c1, MonoType_Con c2) 
     | c1 == c2 -> return $ Applied []
     | c1 /= c2 -> throwNamedError  (SolverError_Unify UnifyErrorReason_Head (MonoType_Con c1) (MonoType_Con c2))
@@ -293,7 +295,7 @@ unfamily (MonoType_Fam f vs) = do v <- fresh (string2Name "beta")
                                   return (var v, [Constraint_Unify (var v) (MonoType_Fam f vs)], [v])
 unfamily (MonoType_App s t)  = do (s',c1,v1) <- unfamily s
                                   (t',c2,v2) <- unfamily t
-                                  return (s' :-->: t', c1 ++ c2, v1 ++ v2)
+                                  return (MonoType_App s' t', c1 ++ c2, v1 ++ v2)
 unfamily t                   = return (t, [], [])
 
 unifyInteract :: (String -> Bool) -> [Constraint] -> [Constraint] -> Constraint -> Constraint -> SMonad SolutionStep
